@@ -4,13 +4,13 @@ import requests
 import os
 import datetime
 import json
+import base64
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api.all import *
 from astrbot.core.message.message_event_result import MessageChain
 from astrbot.api.message_components import Plain, Image
 from astrbot.api.event.filter import EventMessageType
-from .config import TEMP_DIR
 
 @register(
     "astrbot_plugin_daily_news",
@@ -25,10 +25,6 @@ class DailyNewsPlugin(Star):
         self.target_groups = config.get("target_groups", [])
         self.push_time = config.get("push_time", "08:00")
         self.show_text_news = config.get("show_text_news", False)
-        
-        # 确保 TEMP_DIR 存在
-        os.makedirs(TEMP_DIR, exist_ok=True)
-        print(f"临时目录路径: {TEMP_DIR}")
         
         # 启动定时任务
         asyncio.create_task(self.daily_task())
@@ -64,31 +60,22 @@ class DailyNewsPlugin(Star):
         '''下载每日60s图片
         
         :param news_data: 新闻数据
-        :return: 图片路径
+        :return: 图片的base64编码
         :rtype: str
         '''
         try:
             image_url = news_data["image"]
-            date_str = news_data["date"]
+            print(f"从URL下载图片: {image_url}")
             
-            image_path = os.path.join(TEMP_DIR, f"60s_news_{date_str}.jpg")
-            print(f"下载图片到: {image_path}")
+            response = requests.get(image_url, timeout=30)
+            if response.status_code != 200:
+                raise Exception(f"下载图片失败，状态码: {response.status_code}")
             
-            with open(image_path, "wb") as f:
-                response = requests.get(image_url, timeout=30)
-                if response.status_code != 200:
-                    raise Exception(f"下载图片失败，状态码: {response.status_code}")
-                img_data = response.content
-                f.write(img_data)
+            img_data = response.content
+            print(f"图片下载成功, 大小: {len(img_data)}字节")
+            base64_data = base64.b64encode(img_data).decode('utf-8')
             
-            # 验证文件是否下载成功
-            if not os.path.exists(image_path):
-                raise Exception(f"图片下载失败，文件不存在: {image_path}")
-            
-            file_size = os.path.getsize(image_path)
-            print(f"图片下载成功: {image_path}, 大小: {file_size}字节")
-            
-            return image_path
+            return base64_data
         except Exception as e:
             print(f"下载图片时出错: {e}")
             traceback.print_exc()
@@ -125,7 +112,7 @@ class DailyNewsPlugin(Star):
         
         try:
             news_data = await self.fetch_news_data()
-            image_path = await self.download_image(news_data)
+            image_data = await self.download_image(news_data)
             
             if not self.target_groups:
                 print("未配置目标群组")
@@ -139,11 +126,11 @@ class DailyNewsPlugin(Star):
                     message = [
                         {
                             "type": "image",
-                            "data": {"file": f"file://{image_path}"},
+                            "data": {"file": f"base64://{image_data}"},
                         }
                     ]
                     
-                    print(f"向群组 {group_id} 发送图片: {image_path}")
+                    print(f"向群组 {group_id} 发送图片")
                     payloads = {"group_id": group_id, "message": message}
                     await self.client.api.call_action("send_group_msg", **payloads)
                     
