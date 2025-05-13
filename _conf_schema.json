@@ -16,5 +16,11 @@
     "type": "bool",
     "hint": "是否显示文字新闻，默认隐藏",
     "default": false
+  },
+  "use_local_image_draw": {
+    "description": "是否使用本地图片绘制",
+    "type": "bool",
+    "hint": "是否使用本地图片绘制，为否则使用api获取图片",
+    "default": true
   }
 }

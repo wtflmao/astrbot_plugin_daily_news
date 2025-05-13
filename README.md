@@ -19,6 +19,12 @@
 
 每日 60 秒新闻推送插件 - 自动推送每日热点新闻，让你的群聊成员快速了解全球大事！
 
+## 📢 通知
+
+### 🎉 现在支持全平台推送 (2025-5-13), 配置方式也同样更新了, 参见下方
+
+### 🎉 现在支持本地绘制每日新闻图片(当然也可选 api, 目前 api 的信息源不再提供图片服务, 也许可以等待恢复)
+
 ## ✨ 功能特性
 
 - 🕒 支持定时推送，每日固定时间更新
@@ -41,25 +47,81 @@
 ```json
 {
   "target_groups": {
-    "description": "需要推送新闻的群组ID列表",
+    "description": "需要推送60s新闻的群组唯一标识符列表",
     "type": "list",
-    "hint": "填写需要接收每日新闻推送的群号，如: [123456, 789012]",
-    "default": []
+    "hint": "填写需要接收60s新闻推送的群组唯一标识符，如: aiocqhttp:GroupMessage:1350989414, telegram:FriendMessage:123456",
+    "default": ["aiocqhttp:GroupMessage:这里填写你的群号"]
   },
   "push_time": {
-    "description": "每日推送时间",
+    "description": "推送时间(以服务器时区为准)",
     "type": "string",
-    "hint": "每天的新闻推送时间，格式为 HH:MM，如: 08:00",
+    "hint": "填写推送的时间，如: 08:00, 12:30, 18:00",
     "default": "08:00"
   },
   "show_text_news": {
-    "description": "是否同时推送文字版新闻",
-    "type": "boolean",
-    "hint": "设置为true会同时发送图片和文字，false则只发送图片",
+    "description": "是否显示文字新闻",
+    "type": "bool",
+    "hint": "是否显示文字新闻，默认隐藏",
     "default": false
+  },
+  "use_local_image_draw": {
+    "description": "是否使用本地图片绘制",
+    "type": "bool",
+    "hint": "是否使用本地图片绘制，为否则使用api获取图片",
+    "default": true
   }
 }
 ```
+
+### 🛠️ 参数说明
+
+下面是一份参数对照表:
+| 参数名称 | 类型 | 默认值 | 描述 |
+|----------------------|--------|----------------------------|--------------------------------------------------------------|
+| target_groups | list | ["aiocqhttp:GroupMessage:这里填写你的群号"] | 需要推送 60s 新闻的群组唯一标识符列表 |
+| push_time | string | "08:00" | 推送时间(以服务器时区为准) |
+| show_text_news | bool | false | 是否显示文字新闻，默认隐藏 |
+| use_local_image_draw | bool | true | 是否使用本地图片绘制，为否则使用 api 获取图片 |
+
+群聊唯一标识符分为: 前缀:中缀:后缀
+
+下面是所有可选的群组唯一标识符前缀:
+| 平台 | 群组唯一标识符前缀 |
+|------------------|-------------------------------------|
+| qq, napcat, Lagrange 之类的 | aiocqhttp |
+| qq 官方 bot | qq_official |
+| telegram | telegram |
+| 钉钉 | dingtalk |
+| gewechat 微信(虽然已经停止维护) | gewechat |
+| lark | lark |
+| qq webhook 方法 | qq_official_webhook |
+| astrbot 网页聊天界面 | webchat |
+
+下面是所有可选的群组唯一标识符中缀:
+| 群组唯一标识符中缀 | 描述 |
+|----------------------|--------|
+| GroupMessage | 群组消息 |
+| FriendMessage | 私聊消息 |
+| OtherMessage | 其他消息 |
+
+群组唯一标识符后缀为群号, qq 号等
+
+下面提供部分示例:
+
+1. napcat 平台向私聊用户 1350989414 推送消息
+
+   - `aiocqhttp:FriendMessage:1350989414`
+
+2. napcat 平台向群组 1350989414 推送消息
+
+   - `aiocqhttp:GroupMessage:1350989414`
+
+3. telegram 平台向私聊用户 1350989414 推送消息
+
+   - `telegram:FriendMessage:1350989414`
+
+4. telegram 平台向群组 1350989414 推送消息
+   - `telegram:GroupMessage:1350989414`
 
 ## 📝 使用命令
 
@@ -93,7 +155,11 @@
   - ✅ 支持定时和手动推送功能
   - ✅ 多群组推送支持
 - v1.0.1
-  - ✅ 修复当消息推送平台和astrbot不在一个环境中时不能推送图片的bug
+  - ✅ 修复当消息推送平台和 astrbot 不在一个环境中时不能推送图片的 bug
+- v2.0
+  - ✅ 支持全平台推送
+  - ✅ 支持本地绘制每日新闻图片
+  - ✅ 优化配置方式
 
 ## 💡 使用提示
 

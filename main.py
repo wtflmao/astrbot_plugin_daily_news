@@ -9,6 +9,7 @@ from astrbot.api import logger
 from astrbot.core.message.message_event_result import MessageChain
 from astrbot.api.message_components import Plain, Image
 from astrbot.api.event.filter import EventMessageType
+from .news_image_generator import create_news_image_from_data
 
 
 @register(
@@ -24,6 +25,7 @@ class DailyNewsPlugin(Star):
         self.target_groups = config.get("target_groups", [])
         self.push_time = config.get("push_time", "08:00")
         self.show_text_news = config.get("show_text_news", False)
+        self.use_local_image_draw = config.get("use_local_image_draw", True)
 
         # 启动定时任务
         asyncio.create_task(self.daily_task())
@@ -102,7 +104,13 @@ class DailyNewsPlugin(Star):
         try:
             news_data = await self.fetch_news_data()
             logger.debug(f"[每日新闻] 获取到的新闻数据: {news_data}")
-            image_data = await self.download_image(news_data)
+            if not self.use_local_image_draw:
+                image_data = await self.download_image(news_data)
+            else:
+                image_data = create_news_image_from_data(news_data, logger)
+                logger.debug(
+                    f"[图片生成] 生成的图片 Base64 数据前 100 字符: {image_data[:100]}"
+                )
 
             if not self.target_groups:
                 logger.info("[每日新闻] 未配置目标群组")
