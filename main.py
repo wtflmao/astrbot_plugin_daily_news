@@ -1,6 +1,6 @@
 import asyncio
 import traceback
-import requests
+import aiohttp
 import datetime
 import base64
 from astrbot.api.event import filter, AstrMessageEvent
@@ -28,12 +28,6 @@ class DailyNewsPlugin(Star):
         # 启动定时任务
         asyncio.create_task(self.daily_task())
 
-    @filter.on_astrbot_loaded()
-    async def on_astrbot_loaded(self):
-        if not hasattr(self, "client"):
-            self.client = self.context.get_platform("aiocqhttp").get_client()
-        return
-
     # 获取60s新闻数据
     async def fetch_news_data(self):
         """获取每日60s新闻数据
@@ -43,12 +37,13 @@ class DailyNewsPlugin(Star):
         """
         try:
             url = "https://60s-api.viki.moe/v2/60s"
-            response = requests.get(url)
-            if response.status_code == 200:
-                data = response.json()
-                return data["data"]
-            else:
-                raise Exception(f"API返回错误代码: {response.status_code}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data["data"]
+                    else:
+                        raise Exception(f"API返回错误代码: {response.status}")
         except Exception as e:
             logger.error(f"[每日新闻] 获取新闻数据时出错: {e}")
             traceback.print_exc()
@@ -66,15 +61,15 @@ class DailyNewsPlugin(Star):
             image_url = news_data["image"]
             logger.info(f"[每日新闻] 从URL下载图片: {image_url}")
 
-            response = requests.get(image_url, timeout=30)
-            if response.status_code != 200:
-                raise Exception(f"下载图片失败，状态码: {response.status_code}")
-
-            img_data = response.content
-            logger.info(f"[每日新闻] 图片下载成功, 大小: {len(img_data)}字节")
-            base64_data = base64.b64encode(img_data).decode("utf-8")
-
-            return base64_data
+            async with aiohttp.ClientSession() as session:
+                timeout = aiohttp.ClientTimeout(total=30)
+                async with session.get(image_url, timeout=timeout) as response:
+                    if response.status != 200:
+                        raise Exception(f"下载图片失败，状态码: {response.status}")
+                    image_data = await response.read()
+                    logger.info(f"[每日新闻] 图片下载成功, 大小: {len(image_data)}字节")
+                    base64_data = base64.b64encode(image_data).decode("utf-8")
+                    return base64_data
         except Exception as e:
             logger.error(f"[每日新闻] 下载图片时出错: {e}")
             traceback.print_exc()
@@ -104,12 +99,9 @@ class DailyNewsPlugin(Star):
     # 向指定群组推送60s新闻
     async def send_daily_news(self):
         """向所有目标群组推送每日新闻"""
-        if not hasattr(self, "client"):
-            while not hasattr(self, "client"):
-                await asyncio.sleep(10)
-
         try:
             news_data = await self.fetch_news_data()
+            logger.debug(f"[每日新闻] 获取到的新闻数据: {news_data}")
             image_data = await self.download_image(news_data)
 
             if not self.target_groups:
@@ -123,28 +115,19 @@ class DailyNewsPlugin(Star):
             for group_id in self.target_groups:
                 try:
                     # 首先发送图片
-                    message = [
-                        {
-                            "type": "image",
-                            "data": {"file": f"base64://{image_data}"},
-                        }
-                    ]
-
+                    image_message_chain = MessageChain()
+                    image_message = [Image.fromBase64(image_data)]
+                    image_message_chain.chain = image_message
                     logger.info(f"[每日新闻] 向群组 {group_id} 发送图片")
-                    payloads = {"group_id": group_id, "message": message}
-                    await self.client.api.call_action("send_group_msg", **payloads)
+                    await self.context.send_message(group_id, image_message_chain)
 
                     # 如果配置了显示文本新闻，则发送文本
                     if self.show_text_news:
+                        text_message_chain = MessageChain()
                         text_news = self.generate_news_text(news_data)
-                        text_message = [
-                            {
-                                "type": "text",
-                                "data": {"text": text_news},
-                            }
-                        ]
-                        payloads = {"group_id": group_id, "message": text_message}
-                        await self.client.api.call_action("send_group_msg", **payloads)
+                        text_message = [Plain(text_news)]
+                        text_message_chain.chain = text_message
+                        await self.context.send_message(group_id, text_message_chain)
 
                     logger.info(f"[每日新闻] 已向群 {group_id} 推送每日新闻")
                     await asyncio.sleep(1)
@@ -233,7 +216,7 @@ class DailyNewsPlugin(Star):
             self.show_text_news = original_show_text
 
             yield event.plain_result(
-                f"已成功向 {len(self.target_groups)} 个群组推送新闻"
+                f"[每日新闻] 已成功向 {len(self.target_groups)} 个群组推送新闻"
             )
 
         except Exception as e:
