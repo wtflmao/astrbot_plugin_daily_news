@@ -14,8 +14,8 @@ from .news_image_generator import create_news_image_from_data
 
 @register(
     "astrbot_plugin_daily_news",
-    "anka",
-    "anka - 每日60s新闻推送插件, 请先设置推送目标和时间, 详情见github页面!",
+    "hhzm",
+    "hhzm - 每日60s新闻推送插件, 请先设置推送目标和时间, 详情见github页面!",
     "1.0.0",
 )
 class DailyNewsPlugin(Star):
@@ -38,7 +38,7 @@ class DailyNewsPlugin(Star):
         :rtype: dict
         """
         try:
-            url = "https://60s-api.viki.moe/v2/60s"
+            url = "https://ai-news-api.openai-service.workers.dev/"
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as response:
                     if response.status == 200:
