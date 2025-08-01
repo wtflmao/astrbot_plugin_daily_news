@@ -89,12 +89,12 @@ class DailyNewsPlugin(Star):
         news_items = news_data["news"]
         tip = news_data["tip"]
 
-        text = f"【每日60秒新闻】{date}\n\n"
+        text = f"【每日60秒AI新闻】{date}\n\n"
         for i, item in enumerate(news_items, 1):
             text += f"{i}. {item}\n"
 
         text += f"\n【今日提示】{tip}\n"
-        text += f"数据来源: 每日60秒新闻"
+        text += f"数据来源: 闪电豹猫AI新闻API"
 
         return text
 
