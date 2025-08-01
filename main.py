@@ -16,14 +16,23 @@ from .news_image_generator import create_news_image_from_data
     "astrbot_plugin_daily_news",
     "hhzm",
     "hhzm - 每日60s新闻推送插件, 请先设置推送目标和时间, 详情见github页面!",
-    "1.0.0",
+    "2.0.2",
 )
 class DailyNewsPlugin(Star):
     def __init__(self, context: Context, config: dict):
         super().__init__(context)
         self.config = config
         self.target_groups = config.get("target_groups", [])
-        self.push_time = config.get("push_time", "08:00")
+        
+        # Support both string and list for push_time
+        push_time_config = config.get("push_time", "08:10")
+        if isinstance(push_time_config, str):
+            self.push_times = [push_time_config]
+        elif isinstance(push_time_config, list):
+            self.push_times = push_time_config
+        else:
+            self.push_times = ["08:10"]
+            
         self.show_text_news = config.get("show_text_news", False)
         self.use_local_image_draw = config.get("use_local_image_draw", True)
 
@@ -38,9 +47,9 @@ class DailyNewsPlugin(Star):
         :rtype: dict
         """
         try:
-            url = "https://ai-news-api.openai-service.workers.dev/"
+            url = "https://ai-news-api.hhzm.win/"
             async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
+                async with session.get(url, headers={"User-Agent": "AI-Daily-News Plugin 2.0.2"}) as response:
                     if response.status == 200:
                         data = await response.json()
                         return data["data"]
@@ -94,7 +103,7 @@ class DailyNewsPlugin(Star):
             text += f"{i}. {item}\n"
 
         text += f"\n【今日提示】{tip}\n"
-        text += f"数据来源: 闪电豹猫AI新闻API"
+        text += f"数据来源: 闪电豹猫AI新闻API github.com/wtflmao"
 
         return text
 
@@ -146,17 +155,26 @@ class DailyNewsPlugin(Star):
             logger.error(f"[每日新闻] 推送每日新闻时出错: {e}")
             traceback.print_exc()
 
-    # 计算到明天指定时间的秒数
+    # 计算到下一个指定时间的秒数
     def calculate_sleep_time(self):
         """计算到下一次推送时间的秒数"""
         now = datetime.datetime.now()
-        hour, minute = map(int, self.push_time.split(":"))
-
-        tomorrow = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if tomorrow <= now:
-            tomorrow += datetime.timedelta(days=1)
-
-        seconds = (tomorrow - now).total_seconds()
+        next_push_times = []
+        
+        # Calculate next push time for each configured time
+        for push_time in self.push_times:
+            hour, minute = map(int, push_time.split(":"))
+            next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            
+            # If time already passed today, schedule for tomorrow
+            if next_time <= now:
+                next_time += datetime.timedelta(days=1)
+                
+            next_push_times.append(next_time)
+        
+        # Find the earliest next push time
+        earliest_time = min(next_push_times)
+        seconds = (earliest_time - now).total_seconds()
         return seconds
 
     # 定时任务
@@ -189,10 +207,12 @@ class DailyNewsPlugin(Star):
         hours = int(sleep_time / 3600)
         minutes = int((sleep_time % 3600) / 60)
 
+        push_times_str = ', '.join(self.push_times)
+        
         yield event.plain_result(
             f"每日60s新闻插件正在运行\n"
             f"目标群组: {', '.join(map(str, self.target_groups))} \n"
-            f"推送时间: {self.push_time}\n"
+            f"推送时间: {push_times_str}\n"
             f"文本新闻显示: {'开启' if self.show_text_news else '关闭'}\n"
             f"距离下次推送还有: {hours}小时{minutes}分钟"
         )
